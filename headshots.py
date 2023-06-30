@@ -4,10 +4,10 @@ import cv2
 
 name = 'Shlomi'  # Replace with your name
 
-cam = cv2.VideoCapture(1)  # Use index 0 for the default camera
+cam = cv2.VideoCapture(0)  # Use index 0 for the default camera
 
 cv2.namedWindow("Capture Images", cv2.WINDOW_NORMAL)
-cv2.resizeWindow("Capture Images", 500, 300)
+cv2.resizeWindow("Capture Images", 500, 400)
 
 img_counter = 0
 capture_mode = False

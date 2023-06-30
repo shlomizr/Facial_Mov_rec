@@ -1,3 +1,5 @@
+#! /usr/bin/python
+
 import cv2
 import imutils
 import pickle
