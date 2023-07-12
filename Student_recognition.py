@@ -8,7 +8,7 @@ import ctypes
 def perform_face_recognition(user_id):
     # Run your face recognition script with the provided user ID
     # Replace 'face_recognition_script.py' with the actual name of your face recognition script
-    subprocess.run(['python', 'face_recognition.py', user_id])
+    subprocess.run(['python', 'Facial_recognition.py', user_id])
 
 # Function to handle button click event
 def open_face_recognition():
