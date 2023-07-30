@@ -1,6 +1,7 @@
 # Credit to:
 # 1. https://github.com/carolinedunn/facial_recognition
 # 2. https://github.com/Asadullah-Dal17/Eyes-Position-Estimator-Mediapipe
+# 3. https://core-electronics.com.au/guides/pose-and-face-landmark-raspberry-pi/
 # Modifed was needed in order to ajust it to the project needs
 
 # Notes:
