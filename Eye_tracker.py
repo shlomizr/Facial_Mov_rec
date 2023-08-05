@@ -5,8 +5,11 @@ import numpy as np
 import mediapipe as mp
 import math
 import os
-from tkinter import *
+import tkinter as tk
 from PIL import Image, ImageTk
+import smtplib
+import RPi.GPIO as GPIO
+from time import sleep
 mp_face_mesh = mp.solutions.face_mesh
 
 LEFT_EYE = [ 362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385,384, 398 ]
@@ -31,14 +34,47 @@ def iris_position(iris_center, right_point, left_point):
     center_to_right_dist = euclidean_distance(iris_center, right_point)
     total_distance = euclidean_distance(right_point, left_point)
     ratio = center_to_right_dist/total_distance
-    iris_position = ""
+    iris_pos = ""
     if ratio <= 0.30:
-        iris_position = "right"
+        iris_pos = "right"
     elif ratio > 0.42 and ratio <= 0.60:
-        iris_position = "center"
+        iris_pos = "center"
     else:
-        iris_position = "left"
-    return iris_position, ratio
+        iris_pos = "left"
+    return iris_pos, ratio
+
+def emailToInspector(SdudentId):
+    smtpUser = 'finalprog2023@gmail.com'
+    smtpPass = 'edheeqzmjfpulvpm'
+
+    toADD = 'finalprog2023@gmail.com'
+    fromADD = smtpUser
+
+    subject = "Student: " + SdudentId + " varification"
+    header = 'To:' + toADD + "\n" + "From:" + fromADD +"\n" "Subject:" + subject
+    body = "Student number: " + SdudentId + " had been varifed and will start the exam soon." 
+    
+    s = smtplib.SMTP('smtp.gmail.com', 587)
+    s.ehlo()
+    s.starttls()
+    s.ehlo()
+    s.login(smtpUser,smtpPass)
+    s.sendmail(fromADD, toADD, header + "\n\n"+ body)
+
+    s.quit()
+
+
+def VoiceMess():
+    GPIO.setwarnings(False)
+    GPIO.setmode(GPIO.BCM)
+    pe = 7
+    GPIO.setup(pe, GPIO.OUT)
+    GPIO.output(pe,0)
+    sleep(1)
+    GPIO.output(pe, 1)
+    sleep(5)
+    GPIO.output(pe, 0)
+    sleep(1)
 
 cap = cv.VideoCapture(0)
 
@@ -48,6 +84,26 @@ with mp_face_mesh.FaceMesh(
     min_detection_confidence = 0.5,
     min_tracking_confidence = 0.5
     ) as face_mesh:
+        # Create tkinter window
+        root = tk.Tk()
+        root.title("Student Monitoring")
+
+        # Create LED indicators
+        led1_color = "green"
+        led2_color = "green"
+        led3_color = "green"
+
+        led1 = tk.Label(root, text="WARNING 1", bg=led1_color, padx=20, pady=20)
+        led2 = tk.Label(root, text="WARNING 2", bg=led2_color, padx=20, pady=20)
+        led3 = tk.Label(root, text="WARNING 3", bg=led3_color, padx=20, pady=20)
+        ledCnt = 1
+
+
+        # Create layout
+        led1.grid(row=0, column=0, padx=10, pady=10)
+        led2.grid(row=0, column=1, padx=10, pady=10)
+        led3.grid(row=0, column=2, padx=10, pady=10)
+
         while True:
             ret, frame = cap.read()
             if not ret:
@@ -91,6 +147,8 @@ with mp_face_mesh.FaceMesh(
                    cv.LINE_AA,
                )
 
+            # Update GUI
+            root.update()
 
             cv.imshow('Student Video',frame)
 
@@ -100,3 +158,4 @@ with mp_face_mesh.FaceMesh(
             
 cap.release()
 cv.destroyAllWindows()
+root.destroy()
