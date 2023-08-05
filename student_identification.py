@@ -8,15 +8,94 @@ import time
 import face_recognition
 from imutils.video import VideoStream
 from imutils.video import FPS
+import smtplib
+import RPi.GPIO as GPIO
+from time import sleep
 
+
+
+def emailToStudent(studentID,studentEmail):
+    smtpUser = 'finalprog2023@gmail.com'
+    smtpPass = 'edheeqzmjfpulvpm'
+
+    toADD = studentEmail
+    fromADD = smtpUser
+    t =time.localtime()
+    t_date = time.strftime('%D',t)
+    t_time = time.strftime('%H:%M:%S',t)
+
+    subject = "Verification exam email"
+    header = 'To:' + toADD + "\n" + "From:" + fromADD +"\n" "Subject:" + subject
+    body = "Hello," + "\n" + "Your ID (" + studentID + ")" "had been verifed at: " + t_date + " " + t_time + ".\n" + "Good luck" 
+
+    s = smtplib.SMTP('smtp.gmail.com', 587)
+    s.ehlo()
+    s.starttls()
+    s.ehlo()
+    s.login(smtpUser,smtpPass)
+    s.sendmail(fromADD, toADD, header + "\n\n"+ body)
+
+    s.quit()
+
+def emailToInspector(SdudentId):
+    smtpUser = 'finalprog2023@gmail.com'
+    smtpPass = 'edheeqzmjfpulvpm'
+
+    toADD = 'finalprog2023@gmail.com'
+    fromADD = smtpUser
+
+    subject = "Student: " + SdudentId + " varification"
+    header = 'To:' + toADD + "\n" + "From:" + fromADD +"\n" "Subject:" + subject
+    body = "Student number: " + SdudentId + " had been varifed and will start the exam soon." 
+    
+    s = smtplib.SMTP('smtp.gmail.com', 587)
+    s.ehlo()
+    s.starttls()
+    s.ehlo()
+    s.login(smtpUser,smtpPass)
+    s.sendmail(fromADD, toADD, header + "\n\n"+ body)
+
+    s.quit()
+
+
+def VoiceMess():
+    GPIO.setwarnings(False)
+    GPIO.setmode(GPIO.BCM)
+    pe = 4
+    GPIO.setup(pe, GPIO.OUT)
+    GPIO.output(pe,0)
+    sleep(1)
+    GPIO.output(pe, 1)
+    sleep(5)
+    GPIO.output(pe, 0)
+    sleep(1)
 
 def createDict():
     student_db = {
-        "123456789": "Shlomi",
-        "111111111": "Jane Smith",
-        "456789123": "Alice Johnson"
+        "123456789": {
+            "name" : "Shlomi",
+            "email" : "shlomizr71@gmail.com"
+            },
+        "111111111": {
+            "name" : "Barbi" , 
+            "email" : "Barbi@gmail.com"
+            },
+        "456789123": {
+            "name" : "Ken",
+            "email" : "Ken@gmail.com"
+            }
     }
     return student_db
+
+def checkID(user_id_entry, student_dict):
+    user_id = user_id_entry.get()
+    if user_id in student_dict:
+        openFaceRec(user_id, student_dict)
+    else:
+        print("Invalid User ID. Please re-enter.")
+
+    # Clear the user ID entry field
+    user_id_entry.delete(0, tk.END)
 
 
 def openGui(student_dict):
@@ -61,23 +140,16 @@ def openGui(student_dict):
     # Start the GUI event loop
     window.mainloop()
 
-
-def checkID(user_id_entry, student_dict):
-    user_id = user_id_entry.get()
-    if user_id in student_dict:
-        openFaceRec(user_id, student_dict)
-    else:
-        print("Invalid User ID. Please re-enter.")
-
-    # Clear the user ID entry field
-    user_id_entry.delete(0, tk.END)
-
-
 def openFaceRec(user_id, student_dict):
     print("[INFO] Starting facial recognition...")
     print("User ID:", user_id)
 
     encodings_file = "encodings.pickle"
+
+    student_info = student_dict[user_id]
+    student_email = student_info["email"]
+    student_name = student_info["name"]
+  
 
     # Load the known faces and encodings
     print("[INFO] Loading encodings...")
@@ -127,10 +199,13 @@ def openFaceRec(user_id, student_dict):
                         name = data["names"][i]
                         counts[name] = counts.get(name, 0) + 1
 
-                    if name == student_dict[user_id]:
+                    if name == student_name:
                         cnt += 1
                         if cnt == 5:
                             print("Match found!")
+                            emailToStudent(user_id,student_email)
+                            emailToInspector(user_id)
+                            VoiceMess()
                             match_found = True
                             break
                     else:
