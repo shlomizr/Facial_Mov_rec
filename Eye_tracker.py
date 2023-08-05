@@ -37,7 +37,7 @@ def iris_position(iris_center, right_point, left_point):
     iris_pos = ""
     if ratio <= 0.30:
         iris_pos = "right"
-    elif ratio > 0.42 and ratio <= 0.60:
+    elif ratio > 0.40 and ratio <= 0.50:
         iris_pos = "center"
     else:
         iris_pos = "left"
@@ -50,9 +50,9 @@ def emailToInspector(SdudentId):
     toADD = 'finalprog2023@gmail.com'
     fromADD = smtpUser
 
-    subject = "Student: " + SdudentId + " varification"
+    subject = "Student number: " + SdudentId + " was suspected of copying"
     header = 'To:' + toADD + "\n" + "From:" + fromADD +"\n" "Subject:" + subject
-    body = "Student number: " + SdudentId + " had been varifed and will start the exam soon." 
+    body = "Student number: " + SdudentId + " was suspected of copying while doiung exam" 
     
     s = smtplib.SMTP('smtp.gmail.com', 587)
     s.ehlo()
@@ -78,6 +78,11 @@ def VoiceMess():
 
 cap = cv.VideoCapture(0)
 
+ledCnt = 1
+cntRight = 0
+cntLeft = 0
+cntCenter = 0
+
 with mp_face_mesh.FaceMesh(
     max_num_faces=1,
     refine_landmarks = True,
@@ -87,6 +92,7 @@ with mp_face_mesh.FaceMesh(
         # Create tkinter window
         root = tk.Tk()
         root.title("Student Monitoring")
+        root.geometry("430x100")
 
         # Create LED indicators
         led1_color = "green"
@@ -96,7 +102,7 @@ with mp_face_mesh.FaceMesh(
         led1 = tk.Label(root, text="WARNING 1", bg=led1_color, padx=20, pady=20)
         led2 = tk.Label(root, text="WARNING 2", bg=led2_color, padx=20, pady=20)
         led3 = tk.Label(root, text="WARNING 3", bg=led3_color, padx=20, pady=20)
-        ledCnt = 1
+      
 
 
         # Create layout
@@ -146,6 +152,47 @@ with mp_face_mesh.FaceMesh(
                    1,
                    cv.LINE_AA,
                )
+               print(iris_pos)
+                # Update LED colors based on iris position
+               if iris_pos == "center":
+                   cntCenter = cntCenter +1
+                   if cntCenter == 90:
+                       cntLeft = 0
+                       cntRight = 0
+                       cntCenter = 0
+
+               if iris_pos == "left":
+                   cntLeft = cntLeft + 1
+                   if cntLeft > 70:
+                       cv.imwrite("photo.jpg", frame)
+                       VoiceMess()
+                       if led1_color == "green":
+                           led1_color = "red"
+                           cntLeft = 0
+                       elif led2_color == "green":
+                           led2_color = "red"
+                           cntLeft = 0
+                       else:
+                           led3_color = "red"
+
+
+               if iris_pos == "right":
+                   cntRight = cntRight + 1
+                   if cntRight > 70:
+                       VoiceMess()
+                       if led1_color == "green":
+                           led1_color = "red"
+                           cntRight = 0
+                       elif led2_color == "green":
+                           led2_color = "red"
+                           cntRight = 0
+                       else:
+                           led3_color = "red"
+
+            # Update LED backgrounds
+            led1.configure(bg=led1_color)
+            led2.configure(bg=led2_color)
+            led3.configure(bg=led3_color)
 
             # Update GUI
             root.update()
