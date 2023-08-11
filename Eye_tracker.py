@@ -118,23 +118,38 @@ with mp_face_mesh.FaceMesh(
         # Create tkinter window
         root = tk.Tk()
         root.title("Student Monitoring")
-        root.geometry("430x100")
+        #root.geometry("430x100")
+        root.configure(bg='#EDEDED')
 
         # Create LED indicators
-        led1_color = "green"
-        led2_color = "green"
-        led3_color = "green"
+        led1_color = "#31EC47"
+        led2_color = "#31EC47"
+        led3_color = "#31EC47"
+        
 
-        # Ceate Labels
+        # Create Labels for LED indicators
         led1 = tk.Label(root, text="WARNING 1", bg=led1_color, padx=20, pady=20)
         led2 = tk.Label(root, text="WARNING 2", bg=led2_color, padx=20, pady=20)
         led3 = tk.Label(root, text="WARNING 3", bg=led3_color, padx=20, pady=20)
       
+        # Create Labels for student information
+        student_id_label = tk.Label(root, text=f"Student ID: {studentId}", bg='#F2F2F2', fg='#333333')
+        student_name_label = tk.Label(root, text=f"Student Name: {studentName}", bg='#F2F2F2', fg='#333333')
+
+        # Create Start Button
+        start_button = tk.Button(root, text="Start Monitoring", padx=20, pady=10, bg="#4285F4", fg="white")
+        exit_button = tk.Button(root, text="Exit", padx=20, pady=10, bg="#FF5733", fg="white")
+
 
         # Create layout
-        led1.grid(row=0, column=0, padx=10, pady=10)
-        led2.grid(row=0, column=1, padx=10, pady=10)
-        led3.grid(row=0, column=2, padx=10, pady=10)
+        led1.grid(row=2, column=0, padx=10, pady=10)
+        led2.grid(row=2, column=1, padx=10, pady=10)
+        led3.grid(row=2, column=2, padx=10, pady=10)
+        student_id_label.grid(row=0, columnspan=3, pady=(20, 5))
+        student_name_label.grid(row=1, columnspan=3, pady=(0, 5))
+        start_button.grid(row=3, columnspan=3, pady=20)
+        exit_button.grid(row=4, column=1, pady=20, padx=(5, 10))
+
 
         while True:
             ret, frame = cap.read()
