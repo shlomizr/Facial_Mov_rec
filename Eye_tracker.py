@@ -139,7 +139,7 @@ with mp_face_mesh.FaceMesh(
 
         # Create Start Button
         start_button = tk.Button(root, text="Start Monitoring", padx=20, pady=10, bg="#4285F4", fg="white")
-        exit_button = tk.Button(root, text="Exit", padx=20, pady=10, bg="#FF5733", fg="white")
+        exit_button = tk.Button(root, text="Exit", command=root.quit, padx=20, pady=10, bg="#FF5733", fg="white")
 
 
         # Create layout

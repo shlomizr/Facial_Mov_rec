@@ -1,246 +1,261 @@
 #! /usr/bin/python3
 
-
 import cv2 as cv
-import mediapipe as mp
-import time
-import utils, math
 import numpy as np
-# variables 
-frame_counter =0
-CEF_COUNTER =0
-TOTAL_BLINKS =0
-# constants
-CLOSED_EYES_FRAME =3
-FONTS =cv.FONT_HERSHEY_COMPLEX
+import mediapipe as mp
+import math
+import time
+import tkinter as tk
+from PIL import Image, ImageTk
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
+import RPi.GPIO as GPIO
+from time import sleep
+import re
+mp_face_mesh = mp.solutions.face_mesh
 
-# face bounder indices 
-FACE_OVAL=[ 10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103,67, 109]
+LEFT_EYE = [ 362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385,384, 398 ]
+RIGHT_IRIS = [474, 475, 476, 477]
 
-# lips indices for Landmarks
-LIPS=[ 61, 146, 91, 181, 84, 17, 314, 405, 321, 375,291, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95,185, 40, 39, 37,0 ,267 ,269 ,270 ,409, 415, 310, 311, 312, 13, 82, 81, 42, 183, 78 ]
-LOWER_LIPS =[61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95]
-UPPER_LIPS=[ 185, 40, 39, 37,0 ,267 ,269 ,270 ,409, 415, 310, 311, 312, 13, 82, 81, 42, 183, 78] 
-# Left eyes indices 
-LEFT_EYE =[ 362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385,384, 398 ]
-LEFT_EYEBROW =[ 336, 296, 334, 293, 300, 276, 283, 282, 295, 285 ]
+RIGHT_EYE = [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246]
+LEFT_IRIS = [469, 470, 471, 472]
 
-# right eyes indices
-RIGHT_EYE=[ 33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161 , 246 ]  
-RIGHT_EYEBROW=[ 70, 63, 105, 66, 107, 55, 65, 52, 53, 46 ]
+L_H_LEFT = [33] # right eye right most landmark
+L_H_RIGHT = [133] # right eye left most landmark
+R_H_LEFT = [362] # left eye right most landmark
+R_H_RIGHT = [263] # left eye left most landmark
 
-map_face_mesh = mp.solutions.face_mesh
-# camera object 
-camera = cv.VideoCapture(0)
-# landmark detection function 
-def landmarksDetection(img, results, draw=False):
-    img_height, img_width= img.shape[:2]
-    # list[(x,y), (x,y)....]
-    mesh_coord = [(int(point.x * img_width), int(point.y * img_height)) for point in results.multi_face_landmarks[0].landmark]
-    if draw :
-        [cv.circle(img, p, 2, (0,255,0), -1) for p in mesh_coord]
 
-    # returning the list of tuples for each landmarks 
-    return mesh_coord
-
-# Euclaidean distance 
-def euclaideanDistance(point, point1):
-    x, y = point
-    x1, y1 = point1
-    distance = math.sqrt((x1 - x)**2 + (y1 - y)**2)
+def euclidean_distance(point1, point2):
+    x1,y1 = point1.ravel()
+    x2,y2 = point2.ravel()
+    distance = math.sqrt((x2-x1)**2+(y2-y1)**2)
     return distance
 
-# Blinking Ratio
-def blinkRatio(img, landmarks, right_indices, left_indices):
-    # Right eyes 
-    # horizontal line 
-    rh_right = landmarks[right_indices[0]]
-    rh_left = landmarks[right_indices[8]]
-    # vertical line 
-    rv_top = landmarks[right_indices[12]]
-    rv_bottom = landmarks[right_indices[4]]
-    # draw lines on right eyes 
-    # cv.line(img, rh_right, rh_left, utils.GREEN, 2)
-    # cv.line(img, rv_top, rv_bottom, utils.WHITE, 2)
-
-    # LEFT_EYE 
-    # horizontal line 
-    lh_right = landmarks[left_indices[0]]
-    lh_left = landmarks[left_indices[8]]
-
-    # vertical line 
-    lv_top = landmarks[left_indices[12]]
-    lv_bottom = landmarks[left_indices[4]]
-
-    rhDistance = euclaideanDistance(rh_right, rh_left)
-    rvDistance = euclaideanDistance(rv_top, rv_bottom)
-
-    lvDistance = euclaideanDistance(lv_top, lv_bottom)
-    lhDistance = euclaideanDistance(lh_right, lh_left)
-
-    reRatio = rhDistance/rvDistance
-    leRatio = lhDistance/lvDistance
-
-    ratio = (reRatio+leRatio)/2
-    return ratio 
-
-# Eyes Extrctor function,
-def eyesExtractor(img, right_eye_coords, left_eye_coords):
-    # converting color image to  scale image 
-    gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-    
-    # getting the dimension of image 
-    dim = gray.shape
-
-    # creating mask from gray scale dim
-    mask = np.zeros(dim, dtype=np.uint8)
-
-    # drawing Eyes Shape on mask with white color 
-    cv.fillPoly(mask, [np.array(right_eye_coords, dtype=np.int32)], 255)
-    cv.fillPoly(mask, [np.array(left_eye_coords, dtype=np.int32)], 255)
-
-    # showing the mask 
-    # cv.imshow('mask', mask)
-    
-    # draw eyes image on mask, where white shape is 
-    eyes = cv.bitwise_and(gray, gray, mask=mask)
-    # change black color to gray other than eys 
-    # cv.imshow('eyes draw', eyes)
-    eyes[mask==0]=155
-    
-    # getting minium and maximum x and y  for right and left eyes 
-    # For Right Eye 
-    r_max_x = (max(right_eye_coords, key=lambda item: item[0]))[0]
-    r_min_x = (min(right_eye_coords, key=lambda item: item[0]))[0]
-    r_max_y = (max(right_eye_coords, key=lambda item : item[1]))[1]
-    r_min_y = (min(right_eye_coords, key=lambda item: item[1]))[1]
-
-    # For LEFT Eye
-    l_max_x = (max(left_eye_coords, key=lambda item: item[0]))[0]
-    l_min_x = (min(left_eye_coords, key=lambda item: item[0]))[0]
-    l_max_y = (max(left_eye_coords, key=lambda item : item[1]))[1]
-    l_min_y = (min(left_eye_coords, key=lambda item: item[1]))[1]
-
-    # croping the eyes from mask 
-    cropped_right = eyes[r_min_y: r_max_y, r_min_x: r_max_x]
-    cropped_left = eyes[l_min_y: l_max_y, l_min_x: l_max_x]
-
-    # returning the cropped eyes 
-    return cropped_right, cropped_left
-
-# Eyes Postion Estimator 
-def positionEstimator(cropped_eye):
-    # getting height and width of eye 
-    h, w =cropped_eye.shape
-    
-    # remove the noise from images
-    gaussain_blur = cv.GaussianBlur(cropped_eye, (9,9),0)
-    median_blur = cv.medianBlur(gaussain_blur, 3)
-
-    # applying thrsholding to convert binary_image
-    ret, threshed_eye = cv.threshold(median_blur, 130, 255, cv.THRESH_BINARY)
-
-    # create fixd part for eye with 
-    piece = int(w/3) 
-
-    # slicing the eyes into three parts 
-    right_piece = threshed_eye[0:h, 0:piece]
-    center_piece = threshed_eye[0:h, piece: piece+piece]
-    left_piece = threshed_eye[0:h, piece +piece:w]
-    
-    # calling pixel counter function
-    eye_position, color = pixelCounter(right_piece, center_piece, left_piece)
-
-    return eye_position, color 
-
-# creating pixel counter function 
-def pixelCounter(first_piece, second_piece, third_piece):
-    # counting black pixel in each part 
-    right_part = np.sum(first_piece==0)
-    center_part = np.sum(second_piece==0)
-    left_part = np.sum(third_piece==0)
-    # creating list of these values
-    eye_parts = [right_part, center_part, left_part]
-
-    # getting the index of max values in the list 
-    max_index = eye_parts.index(max(eye_parts))
-    pos_eye ='' 
-    if max_index==0:
-        pos_eye="RIGHT"
-        color=[utils.BLACK, utils.GREEN]
-    elif max_index==1:
-        pos_eye = 'CENTER'
-        color = [utils.YELLOW, utils.PINK]
-    elif max_index ==2:
-        pos_eye = 'LEFT'
-        color = [utils.GRAY, utils.YELLOW]
+def iris_position(iris_center, right_point, left_point):
+    center_to_right_dist = euclidean_distance(iris_center, right_point)
+    total_distance = euclidean_distance(right_point, left_point)
+    ratio = center_to_right_dist/total_distance
+    iris_pos = ""
+    if ratio <= 0.30:
+        iris_pos = "right"
+    elif ratio > 0.40 and ratio <= 0.50:
+        iris_pos = "center"
     else:
-        pos_eye="Closed"
-        color = [utils.GRAY, utils.YELLOW]
-    return pos_eye, color
+        iris_pos = "left"
+    return iris_pos, ratio
+
+def emailToInspector(SdudentId, imagePath):
+    smtpUser = 'finalprog2023@gmail.com'
+    smtpPass = 'edheeqzmjfpulvpm'
+
+    toADD = 'finalprog2023@gmail.com'
+    fromADD = smtpUser
+
+    t =time.localtime()
+    t_date = time.strftime('%D',t)
+    t_time = time.strftime('%H:%M:%S',t)
+
+    subject = "Student number: " + SdudentId + " was suspected of copying"
+
+    msg = MIMEMultipart()
+    msg['From'] = fromADD
+    msg['To'] = toADD
+    msg['Subject'] = subject
+
+    body = "Student number: " + SdudentId + "  was suspected of copying while doiung exam at: " + t_date + " " + t_time 
+    msg.attach(MIMEText(body, 'plain'))
+
+    with open("Photo1.jpg", "rb") as image_file:
+        image = MIMEImage(image_file.read(), name=imagePath)
+        msg.attach(image)
+
+    s = smtplib.SMTP('smtp.gmail.com', 587)
+    s.starttls()
+    s.login(smtpUser, smtpPass)
+    s.sendmail(fromADD, toADD, msg.as_string())
+    s.quit()
+
+def VoiceMess():
+    GPIO.setwarnings(False)
+    GPIO.setmode(GPIO.BCM)
+    pe = 17
+    GPIO.setup(pe, GPIO.OUT)
+    GPIO.output(pe,0)
+    GPIO.output(pe, 1)
+    time.sleep(0.1)
+    GPIO.output(pe, 0)
+
+def studentInfo():
+    f = open('studentInfo.txt', 'r')
+    line = f.readlines()
+    info = line[0]
+    info = re.search(r'(^\w+),(\s+\w+),(\s+\S+)',info)
+    studentName = info.group(1)
+    studentId = info.group(2)
+    studentEmail = info.group(3)
+    f.close
+    return studentName,studentId,studentEmail
+
+def start_monitoring(root, studentId,led1,led2,led3):
+    cap = cv.VideoCapture(0)
+
+    ledCnt = 1
+    cntRight = 0
+    cntLeft = 0
+    cntCenter = 0
+    done = 0
+
+    with mp_face_mesh.FaceMesh(
+    max_num_faces=1,
+    refine_landmarks = True,
+    min_detection_confidence = 0.5,
+    min_tracking_confidence = 0.5
+    ) as face_mesh:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            frame = cv.flip(frame, 1)
+            rgb_frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
+            img_h, img_w = frame.shape[:2]
+            results = face_mesh.process(rgb_frame)
+            if results.multi_face_landmarks:
+               mesh_points = np.array(
+                    [
+                        np.multiply([p.x,p.y], [img_w,img_h]).astype(int)
+                        for p in results.multi_face_landmarks[0].landmark
+                    ]
+                )
+               (l_cx, l_cy), l_raduis = cv.minEnclosingCircle(mesh_points[LEFT_IRIS])
+               (r_cx, r_cy), r_raduis = cv.minEnclosingCircle(mesh_points[RIGHT_IRIS])
+               center_left = np.array([l_cx, l_cy], dtype=np.int32)
+               center_right = np.array([r_cx, r_cy], dtype=np.int32)
+               cv.circle(frame, tuple(center_left), int(l_raduis),  (255,0,255), 1, cv.LINE_AA)
+               cv.circle(frame, tuple(center_right), int(r_raduis),  (255,0,255), 1, cv.LINE_AA)
+               cv.circle(frame, tuple(mesh_points[R_H_RIGHT][0]), 2, (255,255,255), -1, cv.LINE_AA)
+               cv.circle(frame, tuple(mesh_points[R_H_LEFT][0]), 2, (0,255,255), -1, cv.LINE_AA)
+               cv.circle(frame, tuple(mesh_points[L_H_RIGHT][0]), 2, (0,255,255), -1, cv.LINE_AA)
+               cv.circle(frame, tuple(mesh_points[L_H_LEFT][0]), 2, (255,255,255), -1, cv.LINE_AA)
+               
+               iris_pos, ratio = iris_position(
+                   center_right, mesh_points[R_H_RIGHT], mesh_points[R_H_LEFT][0])
+               cv.putText(
+                   frame,
+                   f"Iris pos: {iris_pos} {ratio:.2f}",
+                   (30, 30),
+                   cv.FONT_HERSHEY_PLAIN,
+                   1.2,
+                   (0,255,0),
+                   1,
+                   cv.LINE_AA,
+               )
+               print(iris_pos)
+                # Update LED colors based on iris position
+               if iris_pos == "center":
+                   cntCenter = cntCenter +1
+                   if cntCenter == 90:
+                       cntLeft = 0
+                       cntRight = 0
+                       cntCenter = 0
+
+               if iris_pos == "left":
+                   cntLeft = cntLeft + 1
+                   if cntLeft > 70: 
+                       VoiceMess()
+                       if led1.cget('bg') == "#31EC47":
+                           led1.config(bg='red')
+                           cntLeft = 0
+                           cv.imwrite("Photo1.jpg", frame)
+                           emailToInspector(studentId,"Photo1.jpg")
+                       elif led2.cget('bg') == "#31EC47":
+                           led2.config(bg='red')
+                           cntLeft = 0
+                           cv.imwrite("Photo2.jpg", frame)
+                           emailToInspector(studentId,"Photo2.jpg")
+                       else:
+                           led3.config(bg='red')
+                           cv.imwrite("Photo3.jpg", frame)
+                           emailToInspector(studentId,"Photo3.jpg")
+                           done = 1
+                           break
 
 
-with map_face_mesh.FaceMesh(min_detection_confidence =0.5, min_tracking_confidence=0.5) as face_mesh:
+               if iris_pos == "right":
+                   cntRight = cntRight + 1
+                   if cntRight > 70:
+                       VoiceMess()
+                       if led1.cget('bg') == "#31EC47":
+                           led1.config(bg='red')
+                           cntRight = 0
+                           cv.imwrite("Photo1.jpg", frame)
+                           emailToInspector(studentId,"Photo1.jpg")
+                       elif led2.cget('bg')== "#31EC47":
+                           led2.config(bg='red')
+                           cntRight = 0
+                           cv.imwrite("Photo2.jpg", frame)
+                           emailToInspector(studentId,"Photo2.jpg")
+                       else:
+                           led3.config(bg='red')
+                           cv.imwrite("Photo3.jpg", frame)
+                           emailToInspector(studentId,"Photo3.jpg")
+                           done = 1
+                           break
+ 
 
-    # starting time here 
-    start_time = time.time()
-    # starting Video loop here.
-    while True:
-        frame_counter +=1 # frame counter
-        ret, frame = camera.read() # getting frame from camera 
-        if not ret: 
-            break # no more frames break
-        #  resizing frame
-        
-        frame = cv.resize(frame, None, fx=1.5, fy=1.5, interpolation=cv.INTER_CUBIC)
-        frame_height, frame_width= frame.shape[:2]
-        rgb_frame = cv.cvtColor(frame, cv.COLOR_RGB2BGR)
-        results  = face_mesh.process(rgb_frame)
-        if results.multi_face_landmarks:
-            mesh_coords = landmarksDetection(frame, results, False)
-            ratio = blinkRatio(frame, mesh_coords, RIGHT_EYE, LEFT_EYE)
-            # cv.putText(frame, f'ratio {ratio}', (100, 100), FONTS, 1.0, utils.GREEN, 2)
-            utils.colorBackgroundText(frame,  f'Ratio : {round(ratio,2)}', FONTS, 0.7, (30,100),2, utils.PINK, utils.YELLOW)
+            cv.imshow('Student Video',frame)
 
-            if ratio >5.5:
-                CEF_COUNTER +=1
-                # cv.putText(frame, 'Blink', (200, 50), FONTS, 1.3, utils.PINK, 2)
-                utils.colorBackgroundText(frame,  f'Blink', FONTS, 1.7, (int(frame_height/2), 100), 2, utils.YELLOW, pad_x=6, pad_y=6, )
+            key = cv.waitKey(1)
+            if key == ord('q'):
+                break
+            if done == 1:
+                break
 
-            else:
-                if CEF_COUNTER>CLOSED_EYES_FRAME:
-                    TOTAL_BLINKS +=1
-                    CEF_COUNTER =0
-            # cv.putText(frame, f'Total Blinks: {TOTAL_BLINKS}', (100, 150), FONTS, 0.6, utils.GREEN, 2)
-            utils.colorBackgroundText(frame,  f'Total Blinks: {TOTAL_BLINKS}', FONTS, 0.7, (30,150),2)
+            root.update()
             
-            cv.polylines(frame,  [np.array([mesh_coords[p] for p in LEFT_EYE ], dtype=np.int32)], True, utils.GREEN, 1, cv.LINE_AA)
-            cv.polylines(frame,  [np.array([mesh_coords[p] for p in RIGHT_EYE ], dtype=np.int32)], True, utils.GREEN, 1, cv.LINE_AA)
-
-            # Blink Detector Counter Completed
-            right_coords = [mesh_coords[p] for p in RIGHT_EYE]
-            left_coords = [mesh_coords[p] for p in LEFT_EYE]
-            crop_right, crop_left = eyesExtractor(frame, right_coords, left_coords)
-            # cv.imshow('right', crop_right)
-            # cv.imshow('left', crop_left)
-            eye_position, color = positionEstimator(crop_right)
-            utils.colorBackgroundText(frame, f'R: {eye_position}', FONTS, 1.0, (40, 220), 2, color[0], color[1], 8, 8)
-            eye_position_left, color = positionEstimator(crop_left)
-            utils.colorBackgroundText(frame, f'L: {eye_position_left}', FONTS, 1.0, (40, 320), 2, color[0], color[1], 8, 8)
-            
-            
-
-
-        # calculating  frame per seconds FPS
-        end_time = time.time()-start_time
-        fps = frame_counter/end_time
-
-        frame =utils.textWithBackground(frame,f'FPS: {round(fps,1)}',FONTS, 1.0, (30, 50), bgOpacity=0.9, textThickness=2)
-        # writing image for thumbnail drawing shape
-        # cv.imwrite(f'img/frame_{frame_counter}.png', frame)
-        cv.imshow('frame', frame)
-        key = cv.waitKey(2)
-        if key==ord('q') or key ==ord('Q'):
-            break
+    cap.release()
     cv.destroyAllWindows()
-    camera.release()
+
+def open_gui(studentName,studentId):
+    root = tk.Tk()
+    root.title("Student Monitoring")
+    #root.geometry("430x100")
+    root.configure(bg='#EDEDED')
+
+    # Create LED indicators
+    led1_color = "#31EC47"
+    led2_color = "#31EC47"
+    led3_color = "#31EC47"
+        
+
+    # Create Labels for LED indicators
+    led1 = tk.Label(root, text="WARNING 1", bg=led1_color, padx=20, pady=20)
+    led2 = tk.Label(root, text="WARNING 2", bg=led2_color, padx=20, pady=20)
+    led3 = tk.Label(root, text="WARNING 3", bg=led3_color, padx=20, pady=20)
+    
+    
+    # Create Labels for student information
+    student_id_label = tk.Label(root, text=f"Student ID: {studentId}", bg='#F2F2F2', fg='#333333')
+    student_name_label = tk.Label(root, text=f"Student Name: {studentName}", bg='#F2F2F2', fg='#333333')
+
+    # Create Start Button
+    start_button = tk.Button(root, text="Start Monitoring", command=lambda: start_monitoring(root, studentId,led1,led2,led3),padx=20, pady=10, bg="#4285F4", fg="white")
+    exit_button = tk.Button(root, text="Exit", command=root.quit, padx=20, pady=10, bg="#FF5733", fg="white")
+
+
+    # Create layout
+    led1.grid(row=2, column=0, padx=10, pady=10)
+    led2.grid(row=2, column=1, padx=10, pady=10)
+    led3.grid(row=2, column=2, padx=10, pady=10)
+    student_id_label.grid(row=0, columnspan=3, pady=(20, 5))
+    student_name_label.grid(row=1, columnspan=3, pady=(0, 5))
+    start_button.grid(row=3, columnspan=3, pady=20)
+    exit_button.grid(row=4, column=1, pady=20, padx=(5, 10))
+
+    root.mainloop()
+
+if __name__ == "__main__":
+    studentName,studentId, studentEmail = studentInfo()
+    open_gui(studentName,studentId)
