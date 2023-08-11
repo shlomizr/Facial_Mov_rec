@@ -4,12 +4,16 @@ import cv2 as cv
 import numpy as np
 import mediapipe as mp
 import math
-import os
+import time
 import tkinter as tk
 from PIL import Image, ImageTk
 import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
 import RPi.GPIO as GPIO
 from time import sleep
+import re
 mp_face_mesh = mp.solutions.face_mesh
 
 LEFT_EYE = [ 362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385,384, 398 ]
@@ -43,41 +47,63 @@ def iris_position(iris_center, right_point, left_point):
         iris_pos = "left"
     return iris_pos, ratio
 
-def emailToInspector(SdudentId):
+def emailToInspector(SdudentId, imagePath):
     smtpUser = 'finalprog2023@gmail.com'
     smtpPass = 'edheeqzmjfpulvpm'
 
     toADD = 'finalprog2023@gmail.com'
     fromADD = smtpUser
 
-    subject = "Student number: " + SdudentId + " was suspected of copying"
-    header = 'To:' + toADD + "\n" + "From:" + fromADD +"\n" "Subject:" + subject
-    body = "Student number: " + SdudentId + " was suspected of copying while doiung exam" 
-    
-    s = smtplib.SMTP('smtp.gmail.com', 587)
-    s.ehlo()
-    s.starttls()
-    s.ehlo()
-    s.login(smtpUser,smtpPass)
-    s.sendmail(fromADD, toADD, header + "\n\n"+ body)
+    t =time.localtime()
+    t_date = time.strftime('%D',t)
+    t_time = time.strftime('%H:%M:%S',t)
 
+    subject = "Student number: " + SdudentId + " was suspected of copying"
+
+    msg = MIMEMultipart()
+    msg['From'] = fromADD
+    msg['To'] = toADD
+    msg['Subject'] = subject
+
+    body = "Student number: " + SdudentId + "  was suspected of copying while doiung exam at: " + t_date + " " + t_time 
+    msg.attach(MIMEText(body, 'plain'))
+
+    with open("Photo1.jpg", "rb") as image_file:
+        image = MIMEImage(image_file.read(), name=imagePath)
+        msg.attach(image)
+
+    s = smtplib.SMTP('smtp.gmail.com', 587)
+    s.starttls()
+    s.login(smtpUser, smtpPass)
+    s.sendmail(fromADD, toADD, msg.as_string())
     s.quit()
 
 
 def VoiceMess():
     GPIO.setwarnings(False)
     GPIO.setmode(GPIO.BCM)
-    pe = 7
+    pe = 17
     GPIO.setup(pe, GPIO.OUT)
     GPIO.output(pe,0)
-    sleep(1)
     GPIO.output(pe, 1)
-    sleep(5)
+    time.sleep(0.1)
     GPIO.output(pe, 0)
-    sleep(1)
+
+def studentInfo():
+    f = open('studentInfo.txt', 'r')
+    line = f.readlines()
+    info = line[0]
+    info = re.search(r'(^\w+),(\s+\w+),(\s+\S+)',info)
+    studentName = info.group(1)
+    studentId = info.group(2)
+    studentEmail = info.group(3)
+    f.close
+    return studentName,studentId,studentEmail
+
 
 cap = cv.VideoCapture(0)
 
+studentName,studentId, studentEmail = studentInfo()
 ledCnt = 1
 cntRight = 0
 cntLeft = 0
@@ -99,11 +125,11 @@ with mp_face_mesh.FaceMesh(
         led2_color = "green"
         led3_color = "green"
 
+        # Ceate Labels
         led1 = tk.Label(root, text="WARNING 1", bg=led1_color, padx=20, pady=20)
         led2 = tk.Label(root, text="WARNING 2", bg=led2_color, padx=20, pady=20)
         led3 = tk.Label(root, text="WARNING 3", bg=led3_color, padx=20, pady=20)
       
-
 
         # Create layout
         led1.grid(row=0, column=0, padx=10, pady=10)
@@ -163,17 +189,22 @@ with mp_face_mesh.FaceMesh(
 
                if iris_pos == "left":
                    cntLeft = cntLeft + 1
-                   if cntLeft > 70:
-                       cv.imwrite("photo.jpg", frame)
+                   if cntLeft > 70: 
                        VoiceMess()
                        if led1_color == "green":
                            led1_color = "red"
                            cntLeft = 0
+                           cv.imwrite("Photo1.jpg", frame)
+                           emailToInspector(studentId,"Photo1.jpg")
                        elif led2_color == "green":
                            led2_color = "red"
                            cntLeft = 0
+                           cv.imwrite("Photo2.jpg", frame)
+                           emailToInspector(studentId,"Photo2.jpg")
                        else:
                            led3_color = "red"
+                           cv.imwrite("Photo3.jpg", frame)
+                           emailToInspector(studentId,"Photo3.jpg")
 
 
                if iris_pos == "right":
@@ -183,17 +214,23 @@ with mp_face_mesh.FaceMesh(
                        if led1_color == "green":
                            led1_color = "red"
                            cntRight = 0
+                           cv.imwrite("Photo1.jpg", frame)
+                           emailToInspector(studentId,"Photo1.jpg")
                        elif led2_color == "green":
                            led2_color = "red"
                            cntRight = 0
+                           cv.imwrite("Photo2.jpg", frame)
+                           emailToInspector(studentId,"Photo2.jpg")
                        else:
                            led3_color = "red"
+                           cv.imwrite("Photo3.jpg", frame)
+                           emailToInspector(studentId,"Photo3.jpg")
 
             # Update LED backgrounds
             led1.configure(bg=led1_color)
             led2.configure(bg=led2_color)
             led3.configure(bg=led3_color)
-
+ 
             # Update GUI
             root.update()
 

@@ -64,11 +64,9 @@ def VoiceMess():
     pe = 4
     GPIO.setup(pe, GPIO.OUT)
     GPIO.output(pe,0)
-    sleep(1)
     GPIO.output(pe, 1)
-    sleep(5)
+    sleep(0.1)
     GPIO.output(pe, 0)
-    sleep(1)
 
 def createDict():
     student_db = {
@@ -96,6 +94,12 @@ def checkID(user_id_entry, student_dict):
 
     # Clear the user ID entry field
     user_id_entry.delete(0, tk.END)
+
+def saveInfo(name, id, email):
+    f = open("studentInfo.txt","w")
+    f.write(name + ", " + id + ", " + email)
+    f.close
+
 
 
 def openGui(student_dict):
@@ -206,6 +210,7 @@ def openFaceRec(user_id, student_dict):
                             emailToStudent(user_id,student_email)
                             emailToInspector(user_id)
                             VoiceMess()
+                            saveInfo(student_name,user_id,student_email)
                             match_found = True
                             break
                     else:
