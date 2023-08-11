@@ -108,6 +108,7 @@ ledCnt = 1
 cntRight = 0
 cntLeft = 0
 cntCenter = 0
+done = 0
 
 with mp_face_mesh.FaceMesh(
     max_num_faces=1,
@@ -160,16 +161,12 @@ with mp_face_mesh.FaceMesh(
             img_h, img_w = frame.shape[:2]
             results = face_mesh.process(rgb_frame)
             if results.multi_face_landmarks:
-               # print(results.multi_face_landmarks[0].landmark)
                mesh_points = np.array(
                     [
                         np.multiply([p.x,p.y], [img_w,img_h]).astype(int)
                         for p in results.multi_face_landmarks[0].landmark
                     ]
                 )
-               # print(mesh_points.shape)
-               # cv.polylines(frame, [mesh_points[LEFT_IRIS]], True, (0,255,0), 1, cv.LINE_AA)
-               # cv.polylines(frame, [mesh_points[RIGHT_IRIS]], True, (0,255,0), 1, cv.LINE_AA)
                (l_cx, l_cy), l_raduis = cv.minEnclosingCircle(mesh_points[LEFT_IRIS])
                (r_cx, r_cy), r_raduis = cv.minEnclosingCircle(mesh_points[RIGHT_IRIS])
                center_left = np.array([l_cx, l_cy], dtype=np.int32)
@@ -206,12 +203,12 @@ with mp_face_mesh.FaceMesh(
                    cntLeft = cntLeft + 1
                    if cntLeft > 70: 
                        VoiceMess()
-                       if led1_color == "green":
+                       if led1_color == "#31EC47":
                            led1_color = "red"
                            cntLeft = 0
                            cv.imwrite("Photo1.jpg", frame)
                            emailToInspector(studentId,"Photo1.jpg")
-                       elif led2_color == "green":
+                       elif led2_color == "#31EC47":
                            led2_color = "red"
                            cntLeft = 0
                            cv.imwrite("Photo2.jpg", frame)
@@ -220,18 +217,20 @@ with mp_face_mesh.FaceMesh(
                            led3_color = "red"
                            cv.imwrite("Photo3.jpg", frame)
                            emailToInspector(studentId,"Photo3.jpg")
+                           done = 1
+                           break
 
 
                if iris_pos == "right":
                    cntRight = cntRight + 1
                    if cntRight > 70:
                        VoiceMess()
-                       if led1_color == "green":
+                       if led1_color == "#31EC47":
                            led1_color = "red"
                            cntRight = 0
                            cv.imwrite("Photo1.jpg", frame)
                            emailToInspector(studentId,"Photo1.jpg")
-                       elif led2_color == "green":
+                       elif led2_color == "#31EC47":
                            led2_color = "red"
                            cntRight = 0
                            cv.imwrite("Photo2.jpg", frame)
@@ -240,6 +239,8 @@ with mp_face_mesh.FaceMesh(
                            led3_color = "red"
                            cv.imwrite("Photo3.jpg", frame)
                            emailToInspector(studentId,"Photo3.jpg")
+                           done = 1
+                           break
 
             # Update LED backgrounds
             led1.configure(bg=led1_color)
@@ -253,6 +254,8 @@ with mp_face_mesh.FaceMesh(
 
             key = cv.waitKey(1)
             if key == ord('q'):
+                break
+            if done == 1:
                 break
             
 cap.release()
