@@ -12,7 +12,6 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 import RPi.GPIO as GPIO
-from time import sleep
 import re
 mp_face_mesh = mp.solutions.face_mesh
 
@@ -47,7 +46,7 @@ def iris_position(iris_center, right_point, left_point):
         iris_pos = "left"
     return iris_pos, ratio
 
-def emailToInspector(SdudentId, imagePath):
+def email_to_inspector(SdudentId, imagePath):
     smtpUser = 'finalprog2023@gmail.com'
     smtpPass = 'edheeqzmjfpulvpm'
 
@@ -78,8 +77,7 @@ def emailToInspector(SdudentId, imagePath):
     s.sendmail(fromADD, toADD, msg.as_string())
     s.quit()
 
-
-def VoiceMess():
+def voice_mess():
     GPIO.setwarnings(False)
     GPIO.setmode(GPIO.BCM)
     pe = 17
@@ -89,7 +87,7 @@ def VoiceMess():
     time.sleep(0.1)
     GPIO.output(pe, 0)
 
-def studentInfo():
+def student_info():
     f = open('studentInfo.txt', 'r')
     line = f.readlines()
     info = line[0]
@@ -100,58 +98,25 @@ def studentInfo():
     f.close
     return studentName,studentId,studentEmail
 
+def exit_program(root):
+    # This function called when the exit button is pressed
+    root.destroy()
 
-cap = cv.VideoCapture(0)
+def start_monitoring(root, studentId,led1,led2,led3):
+    cap = cv.VideoCapture(0)
 
-studentName,studentId, studentEmail = studentInfo()
-ledCnt = 1
-cntRight = 0
-cntLeft = 0
-cntCenter = 0
-done = 0
+    ledCnt = 1
+    cntRight = 0
+    cntLeft = 0
+    cntCenter = 0
+    done = 0
 
-with mp_face_mesh.FaceMesh(
+    with mp_face_mesh.FaceMesh(
     max_num_faces=1,
     refine_landmarks = True,
     min_detection_confidence = 0.5,
     min_tracking_confidence = 0.5
     ) as face_mesh:
-        # Create tkinter window
-        root = tk.Tk()
-        root.title("Student Monitoring")
-        #root.geometry("430x100")
-        root.configure(bg='#EDEDED')
-
-        # Create LED indicators
-        led1_color = "#31EC47"
-        led2_color = "#31EC47"
-        led3_color = "#31EC47"
-        
-
-        # Create Labels for LED indicators
-        led1 = tk.Label(root, text="WARNING 1", bg=led1_color, padx=20, pady=20)
-        led2 = tk.Label(root, text="WARNING 2", bg=led2_color, padx=20, pady=20)
-        led3 = tk.Label(root, text="WARNING 3", bg=led3_color, padx=20, pady=20)
-      
-        # Create Labels for student information
-        student_id_label = tk.Label(root, text=f"Student ID: {studentId}", bg='#F2F2F2', fg='#333333')
-        student_name_label = tk.Label(root, text=f"Student Name: {studentName}", bg='#F2F2F2', fg='#333333')
-
-        # Create Start Button
-        start_button = tk.Button(root, text="Start Monitoring", padx=20, pady=10, bg="#4285F4", fg="white")
-        exit_button = tk.Button(root, text="Exit", command=root.quit, padx=20, pady=10, bg="#FF5733", fg="white")
-
-
-        # Create layout
-        led1.grid(row=2, column=0, padx=10, pady=10)
-        led2.grid(row=2, column=1, padx=10, pady=10)
-        led3.grid(row=2, column=2, padx=10, pady=10)
-        student_id_label.grid(row=0, columnspan=3, pady=(20, 5))
-        student_name_label.grid(row=1, columnspan=3, pady=(0, 5))
-        start_button.grid(row=3, columnspan=3, pady=20)
-        exit_button.grid(row=4, column=1, pady=20, padx=(5, 10))
-
-
         while True:
             ret, frame = cap.read()
             if not ret:
@@ -194,7 +159,7 @@ with mp_face_mesh.FaceMesh(
                 # Update LED colors based on iris position
                if iris_pos == "center":
                    cntCenter = cntCenter +1
-                   if cntCenter == 90:
+                   if cntCenter == 50:
                        cntLeft = 0
                        cntRight = 0
                        cntCenter = 0
@@ -202,21 +167,21 @@ with mp_face_mesh.FaceMesh(
                if iris_pos == "left":
                    cntLeft = cntLeft + 1
                    if cntLeft > 70: 
-                       VoiceMess()
-                       if led1_color == "#31EC47":
-                           led1_color = "red"
+                       voice_mess()
+                       if led1.cget('bg') == "#31EC47":
+                           led1.config(bg='red')
                            cntLeft = 0
                            cv.imwrite("Photo1.jpg", frame)
-                           emailToInspector(studentId,"Photo1.jpg")
-                       elif led2_color == "#31EC47":
-                           led2_color = "red"
+                           email_to_inspector(studentId,"Photo1.jpg")
+                       elif led2.cget('bg') == "#31EC47":
+                           led2.config(bg='red')
                            cntLeft = 0
                            cv.imwrite("Photo2.jpg", frame)
-                           emailToInspector(studentId,"Photo2.jpg")
+                           email_to_inspector(studentId,"Photo2.jpg")
                        else:
-                           led3_color = "red"
+                           led3.config(bg='red')
                            cv.imwrite("Photo3.jpg", frame)
-                           emailToInspector(studentId,"Photo3.jpg")
+                           email_to_inspector(studentId,"Photo3.jpg")
                            done = 1
                            break
 
@@ -224,31 +189,24 @@ with mp_face_mesh.FaceMesh(
                if iris_pos == "right":
                    cntRight = cntRight + 1
                    if cntRight > 70:
-                       VoiceMess()
-                       if led1_color == "#31EC47":
-                           led1_color = "red"
+                       voice_mess()
+                       if led1.cget('bg') == "#31EC47":
+                           led1.config(bg='red')
                            cntRight = 0
                            cv.imwrite("Photo1.jpg", frame)
-                           emailToInspector(studentId,"Photo1.jpg")
-                       elif led2_color == "#31EC47":
-                           led2_color = "red"
+                           email_to_inspector(studentId,"Photo1.jpg")
+                       elif led2.cget('bg')== "#31EC47":
+                           led2.config(bg='red')
                            cntRight = 0
                            cv.imwrite("Photo2.jpg", frame)
-                           emailToInspector(studentId,"Photo2.jpg")
+                           email_to_inspector(studentId,"Photo2.jpg")
                        else:
-                           led3_color = "red"
+                           led3.config(bg='red')
                            cv.imwrite("Photo3.jpg", frame)
-                           emailToInspector(studentId,"Photo3.jpg")
+                           email_to_inspector(studentId,"Photo3.jpg")
                            done = 1
                            break
-
-            # Update LED backgrounds
-            led1.configure(bg=led1_color)
-            led2.configure(bg=led2_color)
-            led3.configure(bg=led3_color)
  
-            # Update GUI
-            root.update()
 
             cv.imshow('Student Video',frame)
 
@@ -257,7 +215,51 @@ with mp_face_mesh.FaceMesh(
                 break
             if done == 1:
                 break
+
+            root.update()
             
-cap.release()
-cv.destroyAllWindows()
-root.destroy()
+    cap.release()
+    cv.destroyAllWindows()
+
+def open_gui(studentName,studentId):
+    root = tk.Tk()
+    root.title("Student Monitoring")
+    #root.geometry("430x100")
+    root.configure(bg='#EDEDED')
+
+    # Create LED indicators
+    led1_color = "#31EC47"
+    led2_color = "#31EC47"
+    led3_color = "#31EC47"
+        
+
+    # Create Labels for LED indicators
+    led1 = tk.Label(root, text="WARNING 1", bg=led1_color, padx=20, pady=20)
+    led2 = tk.Label(root, text="WARNING 2", bg=led2_color, padx=20, pady=20)
+    led3 = tk.Label(root, text="WARNING 3", bg=led3_color, padx=20, pady=20)
+    
+    
+    # Create Labels for student information
+    student_id_label = tk.Label(root, text=f"Student ID: {studentId}", bg='#F2F2F2', fg='#333333')
+    student_name_label = tk.Label(root, text=f"Student Name: {studentName}", bg='#F2F2F2', fg='#333333')
+
+    # Create Start Button
+    start_button = tk.Button(root, text="Start Monitoring", command=lambda: start_monitoring(root, studentId,led1,led2,led3),padx=20, pady=10, bg="#4285F4", fg="white")
+    exit_button = tk.Button(root, text="Exit", command=lambda: exit_program(root), padx=20, pady=10, bg="#FF5733", fg="white")
+
+    root.protocol("WM_DELETE_WINDOW", lambda: exit_program(root))  # Handle window close event
+    
+    # Create layout
+    led1.grid(row=2, column=0, padx=10, pady=10)
+    led2.grid(row=2, column=1, padx=10, pady=10)
+    led3.grid(row=2, column=2, padx=10, pady=10)
+    student_id_label.grid(row=0, columnspan=3, pady=(20, 5))
+    student_name_label.grid(row=1, columnspan=3, pady=(0, 5))
+    start_button.grid(row=3, columnspan=3, pady=20)
+    exit_button.grid(row=4, column=1, pady=20, padx=(5, 10))
+
+    root.mainloop()
+
+if __name__ == "__main__":
+    studentName,studentId, studentEmail = student_info()
+    open_gui(studentName,studentId)
